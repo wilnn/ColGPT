@@ -1,5 +1,5 @@
 #from abc import ABC, abstractmethod
-from transformers import ProcessorMixin
+from transformers import AutoModelForCausalLM, AutoModel, ProcessorMixin
 import torch
 #from utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
 #from torch import nn
@@ -10,11 +10,11 @@ from transformers.generation import GenerationConfig, LogitsProcessorList, Stopp
 #from transformers.processing_utils import Unpack
 from typing import Callable
 from transformers import PreTrainedModel, AutoModelForCausalLM, AutoConfig
-from configuration_llava import LlavaConfig
+from .configuration_llava import CustomLlavaConfig
 import gc
-from vision_projector.spp import SPP
-from vision_encoder.siglip import SiglipVisionEncoder
-from language_model.llama.modeling_llama import LlamaForCausalLM
+from .vision_projector.spp import SPP
+from .vision_encoder.siglip import SiglipVisionEncoder
+from .language_model.llama.modeling_llama import LlamaForCausalLM
 import sys
 
 #from utils.config import LlavaFusionTypes
@@ -42,8 +42,11 @@ class LlavaVisionEncoder(PreTrainedModel):
 '''
 
 
-class LlavaModel(PreTrainedModel):
-    def __init__(self, config: LlavaConfig = None, vision_encoder=None, 
+class LlavaPreTrainedModel(PreTrainedModel):
+    config_class = CustomLlavaConfig
+
+class LlavaModel(LlavaPreTrainedModel):
+    def __init__(self, config: CustomLlavaConfig = None, vision_encoder=None, 
                     vision_projector = None, 
                     language_model=None):
         super().__init__(config)
@@ -222,8 +225,8 @@ class LlavaModel(PreTrainedModel):
         if attention_mask is not None: # generation(inference) may not pass attention mask and label
             attention_mask = torch.stack(temp_attention_mask_batch)
 
-        #return input_ids, attention_mask, labels, position_ids
-        return input_ids, attention_mask, labels, images_embeds
+        return input_ids, attention_mask, labels, position_ids
+        #return input_ids, attention_mask, labels, images_embeds
 
 
     '''
@@ -260,15 +263,7 @@ class LlavaModel(PreTrainedModel):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         
         if not inputs_embeds:
-            '''inputs_embeds, attention_mask, labels, position_ids = self.mm_fusion(
-            images=images, input_ids=input_ids, image_pos=image_pos,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            #past_key_values=past_key_values,
-            labels=labels,
-            #output_attentions=output_attentions,
-            )'''
-            return self.mm_fusion(
+            inputs_embeds, attention_mask, labels, position_ids = self.mm_fusion(
             images=images, input_ids=input_ids, image_pos=image_pos,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -276,6 +271,15 @@ class LlavaModel(PreTrainedModel):
             labels=labels,
             #output_attentions=output_attentions,
             )
+            '''return self.mm_fusion(
+            images=images, input_ids=input_ids, image_pos=image_pos,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            #past_key_values=past_key_values,
+            labels=labels,
+            #output_attentions=output_attentions,
+            )'''
+        
         print('pass to lm model')
         return self.get_language_model().forward(
             attention_mask=attention_mask,
@@ -289,10 +293,10 @@ class LlavaModel(PreTrainedModel):
             cache_position=cache_position,
             logits_to_keep=logits_to_keep,
             **kwargs
-        )
+        ), labels
 
-class LlavaForCausalLM(PreTrainedModel):
-    def __init__(self, config: LlavaConfig, vision_encoder=None, vision_projector=None, 
+class LlavaForCausalLM(LlavaPreTrainedModel):
+    def __init__(self, config: CustomLlavaConfig, vision_encoder=None, vision_projector=None, 
                     language_model=None):
         super().__init__(config) # run the init of the PretrainedModel class
                                  # this will set some configs for the PretrainedModel class
@@ -415,6 +419,7 @@ class LlavaForCausalLM(PreTrainedModel):
         )
 
 
-
+AutoModel.register(CustomLlavaConfig, LlavaModel)
+AutoModelForCausalLM.register(CustomLlavaConfig, LlavaForCausalLM)
 
 

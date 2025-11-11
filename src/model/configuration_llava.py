@@ -1,8 +1,8 @@
-from transformers import PretrainedConfig
+from transformers import PretrainedConfig, AutoConfig
 #from utils.constants import LlavaFusionTypes
 
-class LlavaConfig(PretrainedConfig):
-    model_type = "llava"  # used for auto classes and hub registration
+class CustomLlavaConfig(PretrainedConfig):
+    model_type = "Custom_llava"  # used for auto classes and hub registration
     def __init__(self, fusionType="concatenation",
                   ignore_index=-100, image_token_index=-200,image_tag="<image>",  # default image tag
                   model_max_length=None, hidden_size=None,
@@ -28,3 +28,5 @@ class LlavaConfig(PretrainedConfig):
         self.vision_encoder_path = vision_encoder_path
         #self.language_model_type = language_model_type
         self.language_model_path = language_model_path
+
+AutoConfig.register('Custom_llava', CustomLlavaConfig)

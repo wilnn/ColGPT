@@ -1,7 +1,8 @@
+import time
+#start_time = time.time()
 from transformers import ProcessorMixin
 import re
-from transformers import AutoProcessor, AutoModel, AutoModelForCausalLM, AutoImageProcessor,AutoConfig, AutoTokenizer
-from configuration_llava import LlavaConfig
+from transformers import AutoProcessor
 import torch
 from urllib.parse import urlparse
 from PIL import Image
@@ -10,11 +11,7 @@ import inspect
 import gc
 from datetime import datetime
 import sys
-from vision_encoder.siglip import SiglipVisionEncoder
-from vision_projector.spp import SPP
-from language_model.llama.modeling_llama import LlamaForCausalLM
-from modeling_llava import LlavaForCausalLM
-
+from transformers import AutoProcessor
 #from modeling_llava import LlavaForCausalLM
 
 class LlavaProcessor(ProcessorMixin):
@@ -114,13 +111,13 @@ class LlavaProcessor(ProcessorMixin):
             temp+= f'\n\nCutting Knowledge Date: December 2023\nToday Date:{date_string}\n\n{system_content}<|eot_id|>'
         
         if user_header:
-            temp+=f'<|start_header_id|>{user_header}<|end_header_id|>'
+            temp+=f'<|start_header_id|>{user_header}<|end_header_id|>\n\n'
         if user_content:
-            temp+=f'\n\n{user_content}<|eot_id|>'
+            temp+=f'{user_content}<|eot_id|>'
         if assistant_header:
-            temp+=f'<|start_header_id|>{assistant_header}<|end_header_id|>'
+            temp+=f'<|start_header_id|>{assistant_header}<|end_header_id|>\n\n'
         if assistant_content:
-            temp+=f'\n\n{assistant_content}<|eot_id|>'
+            temp+=f'{assistant_content}<|eot_id|>'
         return temp
     
     def __call__(self, text, images=None, 
@@ -152,8 +149,8 @@ class LlavaProcessor(ProcessorMixin):
             returns:
                 return a dict that has:
                 {
-                    'image_pos': a list of tensor and empty list. 
-                    'images': a list of list of tensor and empty list. 
+                    'image_pos': a list of list. 
+                    'images': a list of tensor and empty list. 
                             empty list indicate the corresponding example in the batch
                             do not have any images. 
                     'input_ids':a tensor of shape (batch size, model_max_length)
@@ -377,6 +374,8 @@ class LlavaProcessor(ProcessorMixin):
                     if n == 0:  #add bos token at the beginning of this input_ids
                                 #and also a mask for this bos token
                         one_input_ids.append(torch.tensor([self.tokenizer.bos_token_id], dtype=dtype, device=out['input_ids'].device))
+                        one_labels.append(torch.tensor([self.tokenizer.bos_token_id], dtype=dtype, device=out['input_ids'].device))
+
                         one_attention_mask.append(torch.tensor([1], dtype=dtype, device=out['attention_mask'].device))
                         remain_length -= 1
                     
@@ -402,7 +401,7 @@ class LlavaProcessor(ProcessorMixin):
                         print(f"warning: run out of sequence length space, and it may have performed a truncation. the max sequence length is {self.tokenizer.model_max_length} tokens and has {remain_length} tokens space left. You should increase the model_max_length")
                         one_input_ids[-1][-1] = self.tokenizer.pad_token_id
                         one_attention_mask[-1][-1] = 0
-                        temp = torch.full((remain_length+1,), -100, dtype=dtype, device=one_labels[-1].device)
+                        temp = torch.full((remain_length,), -100, dtype=dtype, device=one_labels[-1].device)
                         one_labels.append(temp)
                         break
 
@@ -423,7 +422,7 @@ class LlavaProcessor(ProcessorMixin):
                         # remain_length + 1 here since the labels is currently one token lesser than the
                         # input_ids due to the bos token at the beginning of this input_ids example while the
                         # label do not have this bos token (this is shift left the token)
-                        temp = torch.full((remain_length + 1,), -100, dtype=dtype, device=one_labels[-1].device)
+                        temp = torch.full((remain_length,), -100, dtype=dtype, device=one_labels[-1].device)
                         one_labels.append(temp)
                         break
 
@@ -436,7 +435,7 @@ class LlavaProcessor(ProcessorMixin):
             input_ids = torch.stack(input_ids)
 
         else: ############ GENERATE (INFERENCE) CASE ##################
-            tokenizer.truncation_side = 'left' # truncate the earlier message if it is too long 
+            self.tokenizer.truncation_side = 'left' # truncate the earlier message if it is too long 
                                             # the default 'right' truncate will remove the 
                                             # generation prompt and not good idea for chat bot
                                             # in general
@@ -538,445 +537,7 @@ class LlavaProcessor(ProcessorMixin):
                 'attention_mask':attention_mask,
                 'labels':labels,
             }
-'''
-processor = LlavaProcessor(AutoImageProcessor.from_pretrained("google/siglip-so400m-patch14-384"),
-                           AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct"),)
-#print('done0')
-#print(config.image_token_index)  # Should print the index of the image tag in the tokenizer's vocabulary
-processor.save_pretrained('./src/model/llava')
-#print("done1")
-processor = AutoProcessor.from_pretrained('./src/model/llava')
-print(type(processor.image_processor))
-print(type(processor.tokenizer))
 
 
-sys.exit(0)
-'''
-device = 'cuda:0'
-vision_config = AutoConfig.from_pretrained("google/siglip-so400m-patch14-384")
-vision_encoder = AutoModel.from_pretrained("google/siglip-so400m-patch14-384").vision_model
-vision_encoder = SiglipVisionEncoder(vision_model=vision_encoder)
+AutoProcessor.register('LlavaProcessor', LlavaProcessor)
 
-lm_config = AutoConfig.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
-language_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
-
-tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-1B-Instruct')
-
-# if the cli arg has set a custom max length 
-custom_max_length = 2000
-if custom_max_length:
-    max_length = custom_max_length
-else:
-    max_length = tokenizer.model_max_length
-
-config = LlavaConfig(model_max_length=max_length,
-                     hidden_size=lm_config.hidden_size,
-                     patch_hidden_size=vision_config.vision_config.hidden_size,
-                     vision_projector_type='spp',
-                  pyramid_shapes= [[14, 14], [7, 7], [1, 1]],
-                  vision_encoder_type ='siplip',
-                  vision_encoder_path="google/siglip-so400m-patch14-384",
-                  language_model_path= "meta-llama/Llama-3.2-1B-Instruct",)
-
-tokenizer.model_max_length = max_length
-
-vision_projector = SPP(config)
-
-
-model = LlavaForCausalLM(config=config,
-                         vision_encoder=vision_encoder,
-                         vision_projector=vision_projector,
-                         language_model=language_model).to(device)
-# Get total number of parameters
-num_params = sum(p.numel() for p in model.parameters())
-
-# Get dtype size in bytes (usually 4 for float32, 2 for float16)
-dtype_size = next(model.parameters()).element_size()
-
-# Total size in bytes
-total_bytes = num_params * dtype_size
-
-# Convert to GB
-total_gb = total_bytes / (1024 ** 3)
-
-print(f"Model size (approx): {total_gb:.3f} GB")
-print('dtype:', model.dtype)
-
-################## MAKE PROCESSOR ############################
-
-# some models like Llama do not have the padding token in the vocabulary
-if not tokenizer.pad_token:
-    #self.tokenizer.pad_token = "<pad>"
-    #self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
-    # do this to avoid having to resize the embeddings matrix of the model
-    tokenizer.pad_token = tokenizer.eos_token
-
-#print(tokenizer.eos_token_id)
-
-#sys.exit(0)
-
-'''
-if not tokenizer.unknown_token:
-    tokenizer.unk_token = "<unk>"
-    tokenizer.add_special_tokens({"unk_token": "<unk>"})
-        
-if not tokenizer.eos_token:
-    custom_eos_token = "<eos>"
-    tokenizer.eos_token = custom_eos_token
-    tokenizer.add_special_tokens({"eos_token": custom_eos_token})
-    # TODO: need to resize the embeddings matrix of the model (the nn.embedding layer)
-            #size the vocab size of the tokenizer increased after adding this token into the vocabulary
-
-model.resize_token_embeddings(len(tokenizer))            
-'''
-
-# get the max length for the input because some model has really big max length
-# that can be a lot for padding during tokenization and to also define
-# custom input max length
-#if input_max_length:
-#tokenizer.model_max_length = config.model_max_length
-
-if config.image_tag not in tokenizer.get_vocab():
-    tokenizer.add_tokens([config.image_tag])
-
-# save the id of the image tag in the tokenizer so the config so that
-# the config object will now has the correct image token index
-config.image_token_index = tokenizer.get_vocab()[config.image_tag]
-
-# save image tag to init_kwargs for use in the processor __call__ method
-tokenizer.init_kwargs['image_token'] = config.image_tag
-image_processor = AutoProcessor.from_pretrained("google/siglip-so400m-patch14-384", use_fast=True).image_processor
-
-processor = LlavaProcessor(image_processor=image_processor, tokenizer=tokenizer)
-
-
-####################### TEST ##################################
-
-
-
-text = [[{"role": "system",
-        "content": "yesssssssssss"},
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        ],
-        [{"role": "system",
-        "content": "nooooooooo"},
-        {"role": "user",
-        "content": "<image>noooooooo"},
-        {"role": "assistant",
-        "content": "noooooooo"},
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        ]]
-image = Image.open('./project/ColonGPT/dataset/ColonINST/Positive-images/CVC-ClinicDB/Test/polyp/14.png')
-
-images= [[image, image, image], [image, image, image]]
-
-output = processor(images=images,
-                   text=text,
-                   generation=False,
-                   image_path_in_tag=False,
-                  give_image_but_no_tag = False,
-                 )
-#print(output['images'][0].shape)
-#sys.exit()
-
-######################### TEST PROCESSOR ######################
-
-
-print(f"input_ids shape: {output['input_ids'].shape}")
-print(f"attention_mask shape: {output['attention_mask'].shape}")
-print(f"labels shape: {output['labels'].shape}")
-print('\n*********************\n')
-print(f"input_ids: {output['input_ids'][0]}")
-print("##########")
-print(f"attention_mask: {output['attention_mask'][0]}")
-print("##########")
-print(f"labels: {output['labels'][0]}")
-print("\n************************\n")
-print(f"decoded input_ids: {tokenizer.convert_ids_to_tokens(output['input_ids'][0])}")
-#print(f"decoded labels: {tokenizer.convert_ids_to_tokens(output['labels'][0])}")
-print(f'image_pos: {output['image_pos']}')
-print(f'iamge tag: {config.image_tag}')
-print(f'image token id {config.image_token_index}')
-print(f'iamge token id 2: {tokenizer.get_vocab()[config.image_tag]}')
-
-print("***************")
-
-print('compare')
-
-'''
-for i in range(output['input_ids'][0].shape[0]):
-    print(output['input_ids'][0][i], output['labels'][0][i], output['attention_mask'][0][i])
-'''
-#sys.exit(0)
-
-
-
-######################## TEST MODEL ##########################
-print('\n######################## TEST MODEL ##########################\n')
-
-output['attention_mask'] = output['attention_mask'].to(device)
-output['input_ids'] = output['input_ids'].to(device)
-#print(output['input_ids'].requires_grad)
-output['labels'] = output['labels'].to(device)
-for i in range(len(output['images'])):
-    if output['images'][i] is not list:
-        output['images'][i] = output['images'][i].to(device)
-
-
-# IF PASS use_cache=False, THEN IT WILL NOT RETIURN THE PAS_KEY_VALUES
-input_ids, attention_mask, labels, images_embeds = model(**output, use_cache=False)
-
-#output2 = model(**output, use_cache=False)
-#print(output2)
-
-temp1 = torch.full((246,), 1).to(device)
-temp2 = torch.full((246,), -100).to(device)
-
-for i in range(len(output['image_pos'])):
-    offset = 0
-    offset2 = 0
-    for n in range(len(output['image_pos'][i])-1):
-        print('\n')
-        '''
-        if output['image_pos'][i][n] == 56:
-            print(input_ids[i, output['image_pos'][i][n]-offset:output['image_pos'][i][n]-offset+246, :])
-            print("##############")
-            print(images_embeds[i][n])
-            sys.exit(0)'''
-        #print(output['image_pos'][i][n]-offset+offset2, output['image_pos'][i][n]-offset+offset2+246)
-        #print(input_ids[i, output['image_pos'][i][n]-offset+offset2:output['image_pos'][i][n]-offset+offset2+246, :].shape)
-        if torch.allclose(input_ids[i, output['image_pos'][i][n]-offset+offset2:output['image_pos'][i][n]-offset+offset2+246, :], images_embeds[i][n], atol=0):
-            print(f"input_ids, {output['image_pos'][i][n]}, true")
-        else:
-            print(f"input_ids, {output['image_pos'][i][n]}, false")
-
-        if torch.allclose(attention_mask[i, output['image_pos'][i][n]-offset+offset2:output['image_pos'][i][n]-offset+offset2+246], temp1, atol=0):
-            
-            print(f"attention_mask, {output['image_pos'][i][n]}, true")
-        else:
-            '''
-            for k in range(attention_mask[i, n:n+246].shape[0]):
-                print(attention_mask[i, n:n+246][k], temp1[k])
-            sys.exit(0)'''
-            print(f"attention_mask, {output['image_pos'][i][n]}, false")
-        
-        if torch.allclose(labels[i, output['image_pos'][i][n]-offset+offset2:output['image_pos'][i][n]-offset+offset2+246], temp2, atol=0):
-            print(f"labels, {output['image_pos'][i][n]}, true")
-        else:
-            print(f"labels, {output['image_pos'][i][n]}, false")
-        offset +=1
-        offset2 += 246
-
-        
-
-
-
-
-
-sys.exit(0)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-vision_encoder = AutoModel.from_pretrained("google/siglip-so400m-patch14-384").vision_model 
-language_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
-
-
-
-# some models like Llama do not have the padding token in the vocabulary
-if not tokenizer.pad_token:
-    #self.tokenizer.pad_token = "<pad>"
-    #self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
-    # do this to avoid having to resize the embeddings matrix of the model
-    tokenizer.pad_token = tokenizer.eos_token
-
-#print(tokenizer.eos_token_id)
-
-#sys.exit(0)
-
-'''
-if not tokenizer.unknown_token:
-    tokenizer.unk_token = "<unk>"
-    tokenizer.add_special_tokens({"unk_token": "<unk>"})
-        
-if not tokenizer.eos_token:
-    custom_eos_token = "<eos>"
-    tokenizer.eos_token = custom_eos_token
-    tokenizer.add_special_tokens({"eos_token": custom_eos_token})
-    # TODO: need to resize the embeddings matrix of the model (the nn.embedding layer)
-            #size the vocab size of the tokenizer increased after adding this token into the vocabulary
-
-model.resize_token_embeddings(len(tokenizer))            
-'''
-
-# get the max length for the input because some model has really big max length
-# that can be a lot for padding during tokenization and to also define
-# custom input max length
-#if input_max_length:
-#tokenizer.model_max_length = config.model_max_length
-
-if config.image_tag not in tokenizer.get_vocab():
-    tokenizer.add_tokens([config.image_tag])
-
-# save the id of the image tag in the tokenizer so the config so that
-# the config object will now has the correct image token index
-config.image_token_index = tokenizer.get_vocab()[config.image_tag]
-
-# save image tag to init_kwargs for use in the processor __call__ method
-tokenizer.init_kwargs['image_token'] = config.image_tag
-image_processor = AutoProcessor.from_pretrained("google/siglip-so400m-patch14-384", use_fast=True).image_processor
-
-processor = LlavaProcessor(image_processor=image_processor, tokenizer=tokenizer)
-
-#print(image[0].shape)
-#image = torch.stack(image)
-
-text = [[{"role": "system",
-        "content": "yesssssssssss"},
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss", },
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss"},
-        {"role": "user",
-        "content": "<image>yessssssss"},
-        {"role": "assistant",
-        "content": "yessssssss"},
-        ],
-        [{"role": "system",
-        "content": "nooooooooo"},
-        {"role": "user",
-        "content": "<image>noooooooo"},
-        {"role": "assistant",
-        "content": "noooooooo"},
-        {"role": "user",
-        "content": "<image>noooooooo"},
-        {"role": "assistant",
-        "content": "noooooooo"},
-        {"role": "user",
-        "content": "<image>noooooooo"},
-        {"role": "assistant",
-        "content": "noooooooo"}
-        ]]
-image = Image.open('./project/ColonGPT/dataset/ColonINST/Positive-images/CVC-ClinicDB/Test/polyp/14.png')
-
-images= [[image], [image]]
-
-output = processor(images=images, text=text, generation=False)
-'''
-{
-    'images':images,
-    'image_pos': image_pos,
-    'input_ids':input_ids,
-    'attention_mask':attention_mask if attention_mask else None,
-    'labels':labels if labels else None
-}
-'''
-print(f"input_ids shape: {output['input_ids'].shape}")
-print(f"attention_mask shape: {output['attention_mask'].shape}")
-print(f"labels shape: {output['labels'].shape}")
-print('\n*********************\n')
-print(f"input_ids: {output['input_ids'][0]}")
-print("##########")
-print(f"attention_mask: {output['attention_mask'][0]}")
-print("##########")
-print(f"labels: {output['labels'][0]}")
-print("\n************************\n")
-print(f"decoded input_ids: {tokenizer.convert_ids_to_tokens(output['input_ids'][0])}")
-#print(f"decoded labels: {tokenizer.convert_ids_to_tokens(output['labels'][0])}")
-print(f'image_pos: {output['image_pos']}')
-print(f'iamge tag: {config.image_tag}')
-print(f'image token id {config.image_token_index}')
-print(f'iamge token id 2: {tokenizer.get_vocab()[config.image_tag]}')
-
-print("***************")
-
-print('compare')
-
-for i in range(output['input_ids'][0].shape[0]):
-    print(output['input_ids'][0][i], output['labels'][0][i], output['attention_mask'][0][i])
-
-
-sys.exit(0)
-
-
-
-
-
-
-
-
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
-#tokenizer.init_kwargs['image_token'] = '<image>'
-tokenizer.pad_token=tokenizer.eos_token
-tokenizer.chat_template = 'sdfs'
-tokenizer.model_max_length = 2048
-tokenizer.save_pretrained('./src')
-tokenizer.truncation_side = 'left'
-
-tokenizer.save_pretrained("./src")
-
-tokenizer = AutoTokenizer.from_pretrained("./src")
-print(tokenizer.chat_template)
-print(tokenizer.pad_token)
-print(tokenizer.truncation_side)
-
-
-'''
-processor = LlavaProcessor(AutoImageProcessor.from_pretrained("google/siglip-so400m-patch14-384"),
-                           AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct"), llava_config=config,)
-
-print(config.image_token_index)  # Should print the index of the image tag in the tokenizer's vocabulary
-#processor.save_pretrained('./src/model_arch')'''

@@ -4,7 +4,7 @@ import re as regex
 import json
 from tqdm import tqdm
 from collections import Counter
-from math import log2
+
 import pandas as pd
 from pathlib import Path
 
@@ -217,9 +217,19 @@ def clean_text(path, json_folder_path):
                     with open("./dataset/ColonINST/Json-file-clean"+f'/{new_path}', "w") as f:
                         json.dump(clean_json, f, indent=2)
     
-
+def fix_value_in_wrong_key(path):
+    with open(path, "r") as f:
+        data = json.load(f)  # returns a list of dict(json)
+    for i in data:
+        temp = i['image']
+        i['image'] = i['id']
+        i['id'] = temp
+        
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+    
 
 if __name__ == "__main__":
     EDA("./dataset/ColonINST/Json-file", "./dataset/ColonINST/Positive-images")
     #clean_text("./dataset/problematic_text.csv", "./dataset/ColonINST/Json-file")
-
+    #fix_value_in_wrong_key('/home/public/htnguyen/project/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-reg.json')
