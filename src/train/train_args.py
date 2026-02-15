@@ -1,4 +1,30 @@
 import argparse
+from transformers import TrainingArguments
+from dataclasses import dataclass, field
+
+
+@dataclass
+class trainArgs(TrainingArguments):
+    train_set_path: str = None
+    cap_val_set_path: str = None
+    cls_val_set_path: str = None
+    reg_val_set_path: str = None
+    rec_val_set_path: str = None
+    image_path: str = None
+    custom_max_length: int = None
+    ignore_index: int = -100
+    image_tag: str = '<image>'
+    training_stage: int = 1
+    LM_full_fine_tuning: bool = True
+    pretrained_language_model_path: str = "meta-llama/Llama-3.2-1B-Instruct"
+    pretrained_vision_encoder_path: str = "google/siglip-so400m-patch14-384"
+    pretrained_vision_encoder_type: str = 'siglip'
+    fusion_type: str = "concatenation"
+    vision_projector_type: str = "spp"
+    pyramid_shapes: str = "[[14, 14], [7, 7], [1, 1]]"
+    max_dataset_size: int = -1 # negative for full dataset
+
+    #field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
 
 def create_parser(input_args=None):
     parser = argparse.ArgumentParser(description="Training script for Llava model")

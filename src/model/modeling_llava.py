@@ -14,7 +14,7 @@ from .configuration_llava import CustomLlavaConfig
 import gc
 from .vision_projector.spp import SPP
 from .vision_encoder.siglip import SiglipVisionEncoder
-from .language_model.llama.modeling_llama import LlamaForCausalLM
+from transformers import LlamaForCausalLM
 import sys
 
 #from utils.config import LlavaFusionTypes
