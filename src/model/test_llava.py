@@ -3,8 +3,8 @@ import time
 from transformers import ProcessorMixin
 from torchvision import transforms
 import re
-from transformers import AutoProcessor, AutoModel, AutoModelForCausalLM, AutoImageProcessor,AutoConfig, AutoTokenizer
-from configuration_llava import CustomLlavaConfig
+from transformers import AutoImageProcessor, AutoProcessor, AutoModel, AutoModelForCausalLM, AutoImageProcessor,AutoConfig, AutoTokenizer
+from .configuration_llava import CustomLlavaConfig
 import torch
 from urllib.parse import urlparse
 from PIL import Image
@@ -13,11 +13,11 @@ import inspect
 import gc
 from datetime import datetime
 import sys
-from vision_encoder.siglip import SiglipVisionEncoder
-from vision_projector.spp import SPP
-from language_model.llama.modeling_llama import LlamaForCausalLM
-from modeling_llava import LlavaForCausalLM
-from processing_llava import LlavaProcessor
+from .vision_encoder.siglip import SiglipVisionEncoder
+from .vision_projector.spp import SPP
+from transformers import LlamaForCausalLM
+from .modeling_llava import LlavaForCausalLM
+from .processing_llava import LlavaProcessor
 
 
 '''
@@ -40,7 +40,7 @@ vision_encoder = AutoModel.from_pretrained("google/siglip-so400m-patch14-384").v
 vision_encoder = SiglipVisionEncoder(vision_model=vision_encoder)
 
 lm_config = AutoConfig.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
-language_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+language_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B-Instruct", dtype=torch.float32)
 
 tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-3.2-1B-Instruct')
 
@@ -127,7 +127,7 @@ config.image_token_index = tokenizer.get_vocab()[config.image_tag]
 
 # save image tag to init_kwargs for use in the processor __call__ method
 tokenizer.init_kwargs['image_token'] = config.image_tag
-image_processor = AutoProcessor.from_pretrained("google/siglip-so400m-patch14-384", use_fast=True).image_processor
+image_processor = AutoImageProcessor.from_pretrained("google/siglip-so400m-patch14-384")
 
 processor = LlavaProcessor(image_processor=image_processor, tokenizer=tokenizer)
 
@@ -166,7 +166,7 @@ text = [[{"role": "system",
         {"role": "assistant",
         "content": "yessssssss", },
         ]]
-image = Image.open('./project/ColonGPT/dataset/ColonINST/Positive-images/CVC-ClinicDB/Test/polyp/14.png').convert("RGB")
+image = Image.open('./dataset/ColonINST/Positive-images/CVC-ClinicDB/Test/polyp/14.png').convert("RGB")
 transform = transforms.ToTensor()
 image = transform(image)
 images= [[image, image, image], [image, image, image]]
@@ -234,17 +234,19 @@ for i in range(len(output['images'])):
 # IF PASS use_cache=False, THEN IT WILL NOT RETIURN THE PAS_KEY_VALUES
 output2, labels = model(**output, use_cache=False)
 import torch.nn as nn
-print(output2)
+#print(output2)
 print(output2['logits'].shape)
 
 
 # reduction='mean' compute the mean of the per example loss. if not provided,
 # it will default to summing all the loss
 critetion = nn.CrossEntropyLoss(ignore_index=-100, reduction='mean')
-
+print(labels.shape)
 labels = nn.functional.pad(labels, (0, 1), value=-100)
 print(labels.shape)
+# shift the label
 labels= labels[..., 1:].contiguous()
+print("555555555")
 print(labels.shape)
 #output2['logits'] = output2['logits'].float()
 logits = output2['logits'].view(-1, output2['logits'].shape[-1])

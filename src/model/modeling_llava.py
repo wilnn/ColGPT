@@ -138,7 +138,7 @@ class LlavaModel(LlavaPreTrainedModel):
             return self.embed_text(input_ids), attention_mask, position_ids, labels
 
         images_embeds = self.embed_images(images)
-        print("embedded images")
+        #print("embedded images")
         
         # free memory
         #del images
@@ -280,8 +280,8 @@ class LlavaModel(LlavaPreTrainedModel):
             #output_attentions=output_attentions,
             )'''
         
-        print('pass to lm model')
-        return self.get_language_model().forward(
+        #print('pass to lm model')
+        out = self.get_language_model().forward(
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -293,7 +293,9 @@ class LlavaModel(LlavaPreTrainedModel):
             cache_position=cache_position,
             logits_to_keep=logits_to_keep,
             **kwargs
-        ), labels
+        )
+
+        return out
 
 class LlavaForCausalLM(LlavaPreTrainedModel):
     def __init__(self, config: CustomLlavaConfig, vision_encoder=None, vision_projector=None, 

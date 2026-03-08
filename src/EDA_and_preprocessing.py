@@ -228,8 +228,64 @@ def fix_value_in_wrong_key(path):
     with open(path, 'w') as f:
         json.dump(data, f, indent=2)
     
+def merge_json():
+    with open("./dataset/ColonINST/Json-file-clean/train/ColonINST-train-3tasks.json", "r") as f:
+        data1 = json.load(f)
+
+    with open("./dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json", "r") as f:
+        data2 = json.load(f)
+
+    merged = data1 + data2   # combine lists
+
+    with open("./dataset/ColonINST/Json-file-clean/train/ColonINST-train-all.json", "w") as f:
+        json.dump(merged, f, indent=2)
+
+def count():
+    path = "/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-cls.json"
+    with open(path, "r") as f:
+        data = json.load(f)  # returns a list of dict(json)
+    s = set()
+    for n in data:
+        s.add(n["conversations"][1]["value"])
+    
+
+    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/test/ColonINST-test-cls.json", "r") as f:
+        data = json.load(f)  # returns a list of dict(json)
+    for n in data:
+        s.add(n["conversations"][1]["value"])
+    d = {"UNKNOWN": 0, }
+    count = 1
+    for i in s:
+        d[i] = count
+        count +=1
+    print(d)
+
 
 if __name__ == "__main__":
-    EDA("./dataset/ColonINST/Json-file", "./dataset/ColonINST/Positive-images")
+    #EDA("./dataset/ColonINST/Json-file", "./dataset/ColonINST/Positive-images")
     #clean_text("./dataset/problematic_text.csv", "./dataset/ColonINST/Json-file")
     #fix_value_in_wrong_key('/home/public/htnguyen/project/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-reg.json')
+    #merge_json()
+    #count()
+    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json", "r") as f:
+        data = json.load(f)
+    
+    st = ""
+    for n in data:
+        if len(n["conversations"][1]["value"]) > len(st):
+            st = n["conversations"][1]["value"]
+    
+    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/test/ColonINST-test-cap.json", "r") as f:
+        data = json.load(f)
+    
+    for n in data:
+        if len(n["conversations"][1]["value"]) > len(st):
+            st = n["conversations"][1]["value"]
+
+    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-cap.json", "r") as f:
+        data = json.load(f)
+    
+    for n in data:
+        if len(n["conversations"][1]["value"]) > len(st):
+            st = n["conversations"][1]["value"]
+    print(st)

@@ -10,6 +10,10 @@ class trainArgs(TrainingArguments):
     cls_val_set_path: str = None
     reg_val_set_path: str = None
     rec_val_set_path: str = None
+    cap_test_set_path: str = None
+    cls_test_set_path: str = None
+    reg_test_set_path: str = None
+    rec_test_set_path: str = None
     image_path: str = None
     custom_max_length: int = None
     ignore_index: int = -100
@@ -23,7 +27,9 @@ class trainArgs(TrainingArguments):
     vision_projector_type: str = "spp"
     pyramid_shapes: str = "[[14, 14], [7, 7], [1, 1]]"
     max_dataset_size: int = -1 # negative for full dataset
-
+    LM_class: str = 'llama'
+    iou_threshold: int = 0.5
+    stage2_with_cap: bool = False
     #field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
 
 def create_parser(input_args=None):

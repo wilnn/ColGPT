@@ -419,9 +419,6 @@ class LlavaProcessor(ProcessorMixin):
                         temp = torch.full((remain_length,), 0, dtype=dtype, device=one_attention_mask[-1].device)
                         one_attention_mask.append(temp)
                         
-                        # remain_length + 1 here since the labels is currently one token lesser than the
-                        # input_ids due to the bos token at the beginning of this input_ids example while the
-                        # label do not have this bos token (this is shift left the token)
                         temp = torch.full((remain_length,), -100, dtype=dtype, device=one_labels[-1].device)
                         one_labels.append(temp)
                         break
@@ -469,21 +466,25 @@ class LlavaProcessor(ProcessorMixin):
                 indices = []
                 if type(images[n]) is not list: # if this conversation has any image
                     indices = torch.where(input_ids[n]==image_token_id)[0].tolist()
- 
+                    
                     ###### STILL CHECK FOR CASE WHEN PROVIDE THE IMAGE BUT NO IMAGE TAG IN THE PROMPT EVEN THOUGH THEY DO NOT SET THE PARAMETER######
+                    # len(indices) == 0 means there is not image tag found, 
+                    # images[n].shape[0] > 0 means the image is provided
+                    # TODO: the code in this if block below need to be fixed. 
                     if len(indices) == 0 and images[n].shape[0] > 0:
                         
                         indices = range(1, images[n].shape[0]+1)
                         
                         temp = torch.full((images[n].shape[0],), image_token_id, dtype=input_ids.dtype, device=input_ids.device)
-                        input_ids[n] = torch.cat([input_ids[n, 0], temp, input_ids[n, 1:]]) # input_ids[n, 0] is bos token
+                        #print("11111111111111")
+                        input_ids[n] = torch.cat([input_ids[n, 0].unsqueeze(0), temp, input_ids[n, 1:]]) # input_ids[n, 0] is bos token
                         
                         if labels:
                             temp = torch.full((images[n].shape[0],), -100, dtype=labels.dtype, device=labels.device)
                             labels[n] = torch.cat([temp, labels[n]])
                         if attention_mask:
                             temp = torch.full((images[n].shape[0],), 1, dtype=attention_mask.dtype, device=attention_mask.device)
-                            attention_mask[n] = torch.cat([attention_mask[n, 0], temp, attention_mask[n, 1:]])
+                            attention_mask[n] = torch.cat([attention_mask[n, 0].unsqueeze(0), temp, attention_mask[n, 1:]])
                     
                     elif images[n].shape[0] > len(indices) or images[n].shape[0] < len(indices):
                         
@@ -521,7 +522,13 @@ class LlavaProcessor(ProcessorMixin):
                 image_pos.append(temp)
 
         
-        
+        #print(type(input_ids))
+        #print(f"666666666666{self.tokenizer.decode(input_ids, skip_special_tokens=True)}")
+        #print("###########")
+        #labels[labels == -100] = 128009
+        #print(f"{labels}")
+        #print(f"5555555555555{self.tokenizer.decode(labels, skip_special_tokens=True)}")
+        #exit(0)
         if generation:
             return {
                 'images':images,
