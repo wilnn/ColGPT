@@ -35,19 +35,53 @@ import wandb
 from torch import nn
 import numpy as np
 from sklearn.metrics import confusion_matrix
-
-
+from safetensors.torch import load_file
 from pathlib import Path
+import logging
 
 parser = HfArgumentParser((trainArgs,))
 args = parser.parse_args_into_dataclasses()[0]
+
+class ColorFormatter(logging.Formatter):
+
+    COLORS = {
+        logging.DEBUG: "\033[36m",     # cyan
+        logging.INFO: "\033[32m",      # green
+        logging.WARNING: "\033[33m",   # yellow
+        logging.ERROR: "\033[31m",     # red
+        logging.CRITICAL: "\033[41m",  # red background
+    }
+
+    RESET = "\033[0m"
+
+    def format(self, record):
+        color = self.COLORS.get(record.levelno, self.RESET)
+        message = super().format(record)
+        return f"{color}{message}{self.RESET}"
+    
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
+
+handler = logging.StreamHandler()
+formatter = ColorFormatter(
+    fmt="%(asctime)s | %(levelname)s | [%(filename)s:L%(lineno)d]: %(message)s",
+    datefmt="%Y-%m-%d %H:%M",
+)
+
+handler.setFormatter(formatter)
+handler.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+
 if args.resume_from_checkpoint is not None:
     if args.resume_from_checkpoint == "True":
         args.resume_from_checkpoint = True
+        logger.info("Resume from the latest checkpoint")
     elif (args.resume_from_checkpoint == "None" or
 	args.resume_from_checkpoint == "False"):
         args.resume_from_checkpoint = None
-
+    else:
+        logger.info(f"Resume from checkpoint {args.resume_from_checkpoint}")
 
 class LlavaDataset(Dataset):
     def __init__(self, path_to_json,
@@ -119,6 +153,19 @@ def collate_fn(batch):
         'return_labels': True,
     }
 
+def find_linear_modules_for_lora(model):
+    cls = torch.nn.Linear
+    lora_module_names = set()
+    exclude_keywords = ['vision_encoder', 'vision_projector', 'lm_head']
+    for name, module in model.named_modules():
+        if any(mm_keyword in name for mm_keyword in exclude_keywords):
+            continue
+        if isinstance(module, cls):
+            # print(f'[DEBUG] find lora layers to be added: {name}')
+            #names = name.split('.')
+            lora_module_names.add(name)
+    return list(lora_module_names)
+
 
 def create_and_prepare_model(args):
     vision_config = AutoConfig.from_pretrained(args.pretrained_vision_encoder_path).vision_config
@@ -155,37 +202,52 @@ def create_and_prepare_model(args):
     else:
         raise NotImplementedError(f"Unsupported vision projector type: {config.vision_projector_type}\n. Make sure you implement this vision projector type.")
 
-    # STAGE 1. ONLY TRAIN THE VISION PROJECTOR TO ALIGN IMAGE FEATURES TO THE LM'S EMBEDDINGS SPACE
-    if args.training_stage == 1:
-        for param in vision_encoder.parameters():
-            param.requires_grad = False
-        
-        for param in language_model.parameters():
-            param.requires_grad = False
-    
-    elif args.training_stage == 2: # STAGE 2. ONLY TRAIN THE LM
-        for param in vision_encoder.parameters():
-            param.requires_grad = False
-        
-        if not args.LM_full_fine_tuning: # Do LoRA
-            for param in language_model.parameters():
-                param.requires_grad = False
-            
-            lora_config = LoraConfig(
-                    r=args.rank,                     # rank of the low-rank matrices
-                    lora_alpha=args.rank,           # scaling factor
-                    target_modules=["q_proj", 'k_proj', "v_proj", 'o_proj'],  # which layers to inject LoRA
-                    #lora_dropout=0.05,       # dropout in LoRA layers
-                    #bias="none",
-                    task_type="CAUSAL_LM"
-                )
-            language_model = get_peft_model(language_model, lora_config)
-            
-
     model = LlavaForCausalLM(config=config,
                             vision_encoder=vision_encoder,
                             vision_projector=vision_projector,
                             language_model=language_model)
+    
+    if args.training_stage == 2 and args.stage1_checkpoint is not None:
+        state_dict = load_file(args.stage1_checkpoint)
+        model.load_state_dict(state_dict, strict=False)
+        logger.info("Loaded stage 1 checkpoint into the model for stage 2 training")
+
+
+    # STAGE 1. ONLY TRAIN THE VISION PROJECTOR TO ALIGN IMAGE FEATURES TO THE LM'S EMBEDDINGS SPACE
+    if args.training_stage == 1:
+        for param in model.get_vision_encoder().parameters():
+            param.requires_grad = False
+        logger.info("freeze vision encoder in stage 1")
+
+        
+        for param in model.get_language_model().parameters():
+            param.requires_grad = False
+        logger.info("freeze language model in stage 1")
+    
+    # STAGE 2. ONLY TRAIN THE LM AND VISION PROJECTOR
+    elif args.training_stage == 2: 
+        for param in model.get_vision_encoder().parameters():
+            param.requires_grad = False
+        logger.info("freeze vision encoder in stage 2")
+        
+        if not args.LM_full_fine_tuning: # Do LoRA
+            for param in model.get_language_model().parameters():
+                param.requires_grad = False
+            logger.info("freeze language model in stage 2 to apply LoRA")
+            
+            target_modules = find_linear_modules_for_lora(model)
+            #logger.info(target_modules)
+            lora_config = LoraConfig(
+                    r=args.lora_rank,                     # rank of the low-rank matrices
+                    lora_alpha=args.lora_alpha,           # scaling factor
+                    target_modules=target_modules,  # which layers to inject LoRA
+                    #lora_dropout=0.05,       # dropout in LoRA layers
+                    #bias="none",
+                    task_type="CAUSAL_LM"
+                )
+            model = get_peft_model(model, lora_config)
+            logger.info("Applied LoRA to the language model in stage 2")
+
     '''
     # Get total number of parameters
     num_params = sum(p.numel() for p in model.parameters())
@@ -552,7 +614,7 @@ def train(model, train_dataset, val_dataset, compute_metrics):
 def test(trainer, test_dataset):
     # if give a dict of dataset, then the return metric dict 
     # is a dict of all computed metrics for all dataset. +
-    print("Testing the trained model on test set:")
+    logger.info("Testing the trained model on test set:")
     metrics = trainer.evaluate(eval_dataset=test_dataset,
         ignore_keys=None,
         metric_key_prefix="test",
@@ -577,36 +639,15 @@ if __name__ == '__main__':
 
     compute_metrics = ComputeValMetrics(processor.tokenizer, num_valset=num_valset,
                                         iou_threshold=args.iou_threshold)
+    
+    processor.save_pretrained(args.output_dir)
     trainer = train(model, train_dataset=train_dataset, val_dataset=val_dataset,
         compute_metrics=compute_metrics)
 
+
     # check if the embedding matrix and the final lm_head in the language model are tied
     # if tied, it will print out true
-    print(f"############{model.get_language_model().lm_head.weight.data_ptr() == model.get_language_model().model.embed_tokens.weight.data_ptr()}")
+    #print(f"############{model.get_language_model().lm_head.weight.data_ptr() == model.get_language_model().model.embed_tokens.weight.data_ptr()}")
     
     metrics = test(trainer=trainer, test_dataset=test_dataset)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
