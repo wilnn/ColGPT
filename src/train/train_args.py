@@ -35,6 +35,9 @@ class trainArgs(TrainingArguments):
     lora_alpha: int = 256
     #field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
 
+    def __post_init__(self):
+        super().__post_init__()
+
 def create_parser(input_args=None):
     parser = argparse.ArgumentParser(description="Training script for Llava model")
     
