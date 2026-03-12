@@ -30,6 +30,9 @@ class trainArgs(TrainingArguments):
     LM_class: str = 'llama'
     iou_threshold: int = 0.5
     stage2_with_cap: bool = False
+    stage1_checkpoint: str = None
+    lora_rank: int = 128
+    lora_alpha: int = 256
     #field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
 
 def create_parser(input_args=None):
