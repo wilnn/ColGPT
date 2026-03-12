@@ -1,9 +1,11 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=1,7
+export CUDA_VISIBLE_DEVICES=6,7
 export WANDB_PROJECT='CoLonGPT'
-OUTPUT_DIR="model/stage_1"
-RUN_NAME="stage_1"
+#export WANDB_RESUME="must"
+#export WANDB_RUN_ID="9h04h8t1"
+OUTPUT_DIR="model/stage_1_no_instruct"
+RUN_NAME="stage_1_no_instruct"
 TRAINING_STAGE=1
 REPORT_TO="wandb"
 TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json"
@@ -16,7 +18,7 @@ CAP_TEST_DS="./dataset/ColonINST/Json-file-clean/test/ColonINST-test-cap.json"
 CLS_TEST_DS="./dataset/ColonINST/Json-file-clean/test/ColonINST-test-cls.json"
 REC_TEST_DS="./dataset/ColonINST/Json-file-clean/test/ColonINST-test-rec.json"
 REG_TEST_DS="./dataset/ColonINST/Json-file-clean/test/ColonINST-test-reg.json"
-LLM_PATH="meta-llama/Llama-3.2-1B-Instruct"
+LLM_PATH="meta-llama/Llama-3.2-1B"
 VM_PATH="google/siglip-so400m-patch14-384"
 VM_TYPE="siglip"
 VP_TYPE="SPP"
@@ -31,7 +33,7 @@ TRAIN_BATCH_SIZE=8
 EVAL_BATCH_SIZE=8
 GRADIENT_ACCUMULATION_STEPS=2
 LM_CLASS="llama"
-RESUME_FROM_CHECKPOINT="True"
+RESUME_FROM_CHECKPOINT="None"
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
@@ -68,7 +70,7 @@ accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.
             --greater_is_better=false \
             --save_total_limit=2 \
             --logging_strategy="steps" \
-            --logging_steps=1 \
+            --logging_steps=20 \
             --learning_rate=2e-4 \
 			--lr_scheduler_type="cosine" \
 			--warmup_steps=0.05 \
