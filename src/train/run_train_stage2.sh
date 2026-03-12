@@ -1,11 +1,9 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=2,3
+export CUDA_VISIBLE_DEVICES=4,5
 export WANDB_PROJECT='CoLonGPT'
-#export WANDB_RESUME="must"
-#export WANDB_RUN_ID="2dmhdtt5"
-OUTPUT_DIR="model/stage_2_all_no_instruct_lora128_256"
-RUN_NAME="stage_2_all_no_instruct_lora128_256"
+OUTPUT_DIR="model/stage_2_all_no_instruct"
+RUN_NAME="stage_2_all_no_instruct"
 TRAINING_STAGE=2
 REPORT_TO="wandb"
 TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-all.json"
@@ -40,9 +38,7 @@ LORA_ALPHA=256
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
-            --LM_full_fine_tuning=false \
-            --lora_rank=$LORA_RANK \
-            --lora_alpha=$LORA_ALPHA \
+            --log_level="info" \
             --stage1_checkpoint=$STAGE1_CHECKPOINT \
             --stage2_with_cap \
             --bf16 \
