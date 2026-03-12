@@ -16,6 +16,8 @@ from .vision_projector.spp import SPP
 from .vision_encoder.siglip import SiglipVisionEncoder
 from transformers import LlamaForCausalLM
 import sys
+from transformers.generation import GenerationMixin
+
 
 #from utils.config import LlavaFusionTypes
 
@@ -57,12 +59,12 @@ class LlavaModel(LlavaPreTrainedModel):
             self.language_model = language_model
         else:
             
-            if config.vision_encoder_type == 'siglip':
+            if config.vision_encoder_type.lower() == 'siglip':
                 self.vision_encoder = SiglipVisionEncoder(config)
             else:
                 raise NotImplementedError(f"Unsupported vision  encoder type: {config.vision_encoder_type}\n. Make sure you implement this vision encoder type.")
             
-            if config.vision_projector_type == 'spp':
+            if config.vision_projector_type.lower() == 'spp':
                 self.vision_projector = SPP(config)
             else:
                 raise NotImplementedError(f"Unsupported vision projector type: {config.vision_projector_type}\n. Make sure you implement this vision projector type.")
@@ -75,7 +77,7 @@ class LlavaModel(LlavaPreTrainedModel):
                 raise NotImplementedError(f"Unimplemented language model: {config.language_model_type}\n. Make sure you import this language model class (ForCausalLM) and addand if case for it in the LLavaModel class's __init__ method")
             '''
             lm_config = AutoConfig.from_pretrained(config.language_model_path)
-            self.language_model = AutoModelForCausalLM.from_config(lm_config)
+            self.language_model = AutoModelForCausalLM.from_config(lm_config, dtype=torch.float32)
 
 
         if config.fusionType == "concatenation":
@@ -85,6 +87,7 @@ class LlavaModel(LlavaPreTrainedModel):
     
 
         self.llava_config = config
+        self.post_init()
 
 
     def get_vision_encoder(self):
@@ -130,6 +133,7 @@ class LlavaModel(LlavaPreTrainedModel):
                             labels: Optional[torch.LongTensor] = None,
                             #output_attentions: Optional[bool] = None,
     ):
+        # if using kv cache
         if not images or input_ids.shape[-1] == 1:
 
             # return the attention mask as is because it is already correct,
@@ -297,7 +301,10 @@ class LlavaModel(LlavaPreTrainedModel):
 
         return out
 
-class LlavaForCausalLM(LlavaPreTrainedModel):
+# LoRA require the model class to has the method `prepare_inputs_for_generation`
+# which is inherited from `GenerationMixin`
+class LlavaForCausalLM(LlavaPreTrainedModel, GenerationMixin):
+    _tied_weights_keys = {"Llava_model.language_model.lm_head.weight": "Llava_model.language_model.model.embed_tokens.weight"}
     def __init__(self, config: CustomLlavaConfig, vision_encoder=None, vision_projector=None, 
                     language_model=None):
         super().__init__(config) # run the init of the PretrainedModel class
@@ -308,6 +315,7 @@ class LlavaForCausalLM(LlavaPreTrainedModel):
         
         self.Llava_model = LlavaModel(config, vision_encoder, vision_projector,
                                     language_model)
+        self.post_init()
     
     def get_vision_encoder(self):
         return self.Llava_model.get_vision_encoder()
@@ -317,6 +325,26 @@ class LlavaForCausalLM(LlavaPreTrainedModel):
     
     def get_language_model(self):
         return self.Llava_model.get_language_model()
+    
+    # LoRA require the model class to implement this method so that it can 
+    # use to check for weight tie
+    def get_input_embeddings(self):
+        return self.Llava_model.language_model.model.embed_tokens
+    
+    # need to overwrite this because the `prepare_inputs_for_generation` in GenerationMixin
+    # do not take in images
+    def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, attention_mask=None,
+                                    **kwargs):
+        images = kwargs.pop("images", None)
+
+        _inputs = super().prepare_inputs_for_generation(
+            input_ids, past_key_values=past_key_values, inputs_embeds=inputs_embeds, attention_mask=attention_mask,
+            **kwargs
+        )
+
+        if images is not None:
+            _inputs['images'] = images
+        return _inputs
 
     @torch.no_grad()
     def generate( # to use this generate method for inference, simply pass the
