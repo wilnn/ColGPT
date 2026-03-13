@@ -156,7 +156,9 @@ def collate_fn(batch):
 def find_linear_modules_for_lora(model):
     cls = torch.nn.Linear
     lora_module_names = set()
-    exclude_keywords = ['vision_encoder', 'vision_projector', 'lm_head']
+
+    exclude_keywords = ['vision_encoder', 'vision_projector', 'lm_head'] if not args.stage2_lora_all else []
+    logger.info(f"exclude keywords for LoRA: {exclude_keywords}")
     for name, module in model.named_modules():
         if any(mm_keyword in name for mm_keyword in exclude_keywords):
             continue

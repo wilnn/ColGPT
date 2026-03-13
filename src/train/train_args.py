@@ -33,6 +33,7 @@ class trainArgs(TrainingArguments):
     stage1_checkpoint: str = None
     lora_rank: int = 128
     lora_alpha: int = 256
+    stage2_lora_all: bool = False
     #field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
 
     def __post_init__(self):

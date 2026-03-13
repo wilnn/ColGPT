@@ -1,9 +1,11 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=4,5
+export CUDA_VISIBLE_DEVICES=1,2
 export WANDB_PROJECT='CoLonGPT'
-OUTPUT_DIR="model/stage_2_all_no_instruct"
-RUN_NAME="stage_2_all_no_instruct"
+OUTPUT_DIR="model/stage_2_all_lora128_256_loraall"
+RUN_NAME="stage_2_all_lora128_256_loraall"
+#export WANDB_RESUME="must"
+#export WANDB_RUN_ID="9h04h8t1"
 TRAINING_STAGE=2
 REPORT_TO="wandb"
 TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-all.json"
@@ -26,18 +28,22 @@ IMAGE_TAG="<image>"
 IGNORE_INDEX=-100
 MAX_LENGTH=512
 MAX_DATASET_SIZE=-1
-NUM_EPOCHS=4
+NUM_EPOCHS=7
 TRAIN_BATCH_SIZE=8
 EVAL_BATCH_SIZE=8
 GRADIENT_ACCUMULATION_STEPS=2
 LM_CLASS="llama"
 RESUME_FROM_CHECKPOINT="None"
-STAGE1_CHECKPOINT="./model/stage_1_no_instruct/checkpoint-10420/model.safetensors"
+STAGE1_CHECKPOINT="./model/stage_1/checkpoint-10420/model.safetensors"
 LORA_RANK=128
 LORA_ALPHA=256
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
+            --stage2_lora_all \
+            --LM_full_fine_tuning=false \
+            --lora_rank=$LORA_RANK \
+            --lora_alpha=$LORA_ALPHA \
             --log_level="info" \
             --stage1_checkpoint=$STAGE1_CHECKPOINT \
             --stage2_with_cap \

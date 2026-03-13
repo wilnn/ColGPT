@@ -4,14 +4,14 @@ from PIL import Image
 import torch
 from peft import PeftModel
 
-device = "cuda:4"
-model_path = "./model/stage_2_all/checkpoint-32052"
-processor_path = "./model/stage_2_all"
-lora_adapter_path = ""
+device = "cuda:2"
+model_path = "./model/stage_1/checkpoint-10420"
+processor_path = "./model/stage_2_all_lora128_256"
+lora_adapter_path = "./model/stage_2_all_lora128_256/checkpoint-35612"
 
 model = LlavaForCausalLM.from_pretrained(model_path, dtype=torch.float32).to(device)
 if lora_adapter_path:
-    model = PeftModel.from_pretrained(model, lora_adapter_path, safe_serialization=True)
+    model = PeftModel.from_pretrained(model, lora_adapter_path, torch_device=device, safe_serialization=True)
 
 processor = LlavaProcessor.from_pretrained(processor_path)
 max_length = processor.tokenizer.model_max_length
