@@ -1,9 +1,9 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=1,2
+export CUDA_VISIBLE_DEVICES=4,7
 export WANDB_PROJECT='CoLonGPT'
-OUTPUT_DIR="model/stage_2_all_lora128_256_loraall"
-RUN_NAME="stage_2_all_lora128_256_loraall"
+OUTPUT_DIR="model/stage_2_all_lora128_256"
+RUN_NAME="stage_2_all_lora128_256"
 #export WANDB_RESUME="must"
 #export WANDB_RUN_ID="9h04h8t1"
 TRAINING_STAGE=2
@@ -40,7 +40,6 @@ LORA_ALPHA=256
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
-            --stage2_lora_all \
             --LM_full_fine_tuning=false \
             --lora_rank=$LORA_RANK \
             --lora_alpha=$LORA_ALPHA \
