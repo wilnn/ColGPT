@@ -166,6 +166,7 @@ def find_linear_modules_for_lora(model):
             # print(f'[DEBUG] find lora layers to be added: {name}')
             #names = name.split('.')
             lora_module_names.add(name)
+
     return list(lora_module_names)
 
 
