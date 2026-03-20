@@ -4,9 +4,9 @@ from PIL import Image
 import torch
 from peft import PeftModel
 
-device = "cuda:2"
-model_path = "./model/stage_2_all/checkpoint-32052"
-processor_path = "./model/stage_2_all"
+device = "cuda:0"
+model_path = "./model/stage_2_all_caponly/checkpoint-16416"
+processor_path = "./model/stage_2_all_caponly"
 lora_adapter_path = ""
 
 model = LlavaForCausalLM.from_pretrained(model_path, dtype=torch.float32).to(device)
@@ -44,6 +44,7 @@ while inp:
     attention_mask=batch["attention_mask"].to(device)
     assistant_res = ""
     print("assistant: ", end="")
+    position_ids=None
     for i in range(max_length):
         outputs = model(
                     images=images,
@@ -52,10 +53,16 @@ while inp:
                     attention_mask=attention_mask,
                     past_key_values=past_key_values,
                     use_cache=True,
+                    #position_ids=position_ids,
                     )
         
         logits = outputs.logits
+
         past_key_values = outputs.past_key_values
+        #print(dir(outputs.past_key_values.layers[0]))
+        #print(outputs.past_key_values.layers[0].keys.shape)
+        #exit(0)
+        #position_ids = torch.tensor([[outputs.past_key_values.layers[0].keys.shape[2] +1]], device=device)
         next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
         attention_mask = torch.cat([attention_mask,
                             torch.ones((attention_mask.shape[0], 1),
@@ -63,9 +70,9 @@ while inp:
                             dim=1
                             )
 
-        # flush to write output to the terminal immediately
         token = processor.tokenizer.decode(next_token[0], skip_special_tokens=True)
         assistant_res+= token
+        # flush to write output to the terminal immediately
         print(token, end="", flush=True)
 
         # Only feed the new token next iteration
