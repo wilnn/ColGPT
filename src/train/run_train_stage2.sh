@@ -1,14 +1,14 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=4,7
+export CUDA_VISIBLE_DEVICES=0,1
 export WANDB_PROJECT='CoLonGPT'
-OUTPUT_DIR="model/stage_2_all_lora128_256"
-RUN_NAME="stage_2_all_lora128_256"
+OUTPUT_DIR="model/stage_2_all_3tasks"
+RUN_NAME="stage_2_all_3tasks"
 #export WANDB_RESUME="must"
-#export WANDB_RUN_ID="9h04h8t1"
+#export WANDB_RUN_ID="auiqr2aj"
 TRAINING_STAGE=2
 REPORT_TO="wandb"
-TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-all.json"
+TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-3tasks.json"
 DS_IMAGE_PATH="./dataset/ColonINST/Positive-images"
 CAP_VAL_DS="./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cap.json"
 CLS_VAL_DS="./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cls.json"
@@ -35,17 +35,13 @@ GRADIENT_ACCUMULATION_STEPS=2
 LM_CLASS="llama"
 RESUME_FROM_CHECKPOINT="None"
 STAGE1_CHECKPOINT="./model/stage_1/checkpoint-10420/model.safetensors"
-LORA_RANK=128
-LORA_ALPHA=256
+#LORA_RANK=128
+#LORA_ALPHA=256
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
-            --LM_full_fine_tuning=false \
-            --lora_rank=$LORA_RANK \
-            --lora_alpha=$LORA_ALPHA \
             --log_level="info" \
             --stage1_checkpoint=$STAGE1_CHECKPOINT \
-            --stage2_with_cap \
             --bf16 \
             --resume_from_checkpoint=$RESUME_FROM_CHECKPOINT \
             --LM_class=$LM_CLASS \
@@ -95,5 +91,5 @@ accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.
             --num_train_epochs=$NUM_EPOCHS \
             --do_train \
             --do_eval \
-            --dataloader_num_workers=2 \
+            --dataloader_num_workers=8 \
             --ddp_find_unused_parameters=false \
