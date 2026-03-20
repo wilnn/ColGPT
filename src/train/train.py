@@ -312,7 +312,7 @@ def get_datasets(system_prompt, processor):
                            data_processor=processor,
                            dataset_size=args.max_dataset_size,
                            )
-    if args.training_stage == 1:
+    if args.training_stage == 1 or args.stage2_cap_only:
         num_valset = 1
         val_dataset = LlavaDataset(path_to_json=args.cap_val_set_path,
                            path_to_image_folder=args.image_path,
