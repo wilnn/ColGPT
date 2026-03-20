@@ -14,9 +14,9 @@ from .configuration_llava import CustomLlavaConfig
 import gc
 from .vision_projector.spp import SPP
 from .vision_encoder.siglip import SiglipVisionEncoder
-from transformers import LlamaForCausalLM
 import sys
 from transformers.generation import GenerationMixin
+from .language_model.llama.modeling_llama import LlamaForCausalLM
 
 
 #from utils.config import LlavaFusionTypes
@@ -77,7 +77,7 @@ class LlavaModel(LlavaPreTrainedModel):
                 raise NotImplementedError(f"Unimplemented language model: {config.language_model_type}\n. Make sure you import this language model class (ForCausalLM) and addand if case for it in the LLavaModel class's __init__ method")
             '''
             lm_config = AutoConfig.from_pretrained(config.language_model_path)
-            self.language_model = AutoModelForCausalLM.from_config(lm_config, dtype=torch.float32)
+            self.language_model = LlamaForCausalLM(lm_config)
 
 
         if config.fusionType == "concatenation":
@@ -139,7 +139,7 @@ class LlavaModel(LlavaPreTrainedModel):
             # return the attention mask as is because it is already correct,
             # and it does not really matter during inference. return position_ids as is because
             # it should already be correct and is handled outside during inference if needed
-            return self.embed_text(input_ids), attention_mask, position_ids, labels
+            return self.embed_text(input_ids), attention_mask, labels, position_ids
 
         images_embeds = self.embed_images(images)
         #print("embedded images")
@@ -265,7 +265,6 @@ class LlavaModel(LlavaPreTrainedModel):
             logits_to_keep: Union[int, torch.Tensor] = 0,
             **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        
         if not inputs_embeds:
             inputs_embeds, attention_mask, labels, position_ids = self.mm_fusion(
             images=images, input_ids=input_ids, image_pos=image_pos,
@@ -275,15 +274,7 @@ class LlavaModel(LlavaPreTrainedModel):
             labels=labels,
             #output_attentions=output_attentions,
             )
-            '''return self.mm_fusion(
-            images=images, input_ids=input_ids, image_pos=image_pos,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            #past_key_values=past_key_values,
-            labels=labels,
-            #output_attentions=output_attentions,
-            )'''
-        
+
         #print('pass to lm model')
         out = self.get_language_model().forward(
             attention_mask=attention_mask,
