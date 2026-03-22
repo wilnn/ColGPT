@@ -1,14 +1,14 @@
 #!/bin/bash
 
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=2,3
 export WANDB_PROJECT='CoLonGPT'
-OUTPUT_DIR="model/stage_2_all_3tasks"
-RUN_NAME="stage_2_all_3tasks"
+OUTPUT_DIR="model/stage_2_all_caponly2"
+RUN_NAME="stage_2_all_caponly2"
 #export WANDB_RESUME="must"
 #export WANDB_RUN_ID="auiqr2aj"
 TRAINING_STAGE=2
 REPORT_TO="wandb"
-TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-3tasks.json"
+TRAIN_DS="./dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json"
 DS_IMAGE_PATH="./dataset/ColonINST/Positive-images"
 CAP_VAL_DS="./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cap.json"
 CLS_VAL_DS="./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cls.json"
@@ -28,7 +28,7 @@ IMAGE_TAG="<image>"
 IGNORE_INDEX=-100
 MAX_LENGTH=512
 MAX_DATASET_SIZE=-1
-NUM_EPOCHS=7
+NUM_EPOCHS=20
 TRAIN_BATCH_SIZE=8
 EVAL_BATCH_SIZE=8
 GRADIENT_ACCUMULATION_STEPS=2
@@ -40,6 +40,7 @@ STAGE1_CHECKPOINT="./model/stage_1/checkpoint-10420/model.safetensors"
 #--stage2_with_cap \
 
 accelerate launch --config_file ./src/train/accelerate_config.yaml -m src.train.train \
+            --stage2_cap_only \
             --log_level="info" \
             --stage1_checkpoint=$STAGE1_CHECKPOINT \
             --bf16 \
