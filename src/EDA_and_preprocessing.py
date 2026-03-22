@@ -178,8 +178,6 @@ def clean_text(path, json_folder_path):
         df = pd.read_csv(path)
     except Exception as e:
         print("file not found")
-    
-    
 
     #id_list = set(df['id']) # use set since the ids can not contains duplicate
                             # and set provide faster item search than list 
@@ -263,29 +261,18 @@ def count():
 
 if __name__ == "__main__":
     #EDA("./dataset/ColonINST/Json-file", "./dataset/ColonINST/Positive-images")
-    #clean_text("./dataset/problematic_text.csv", "./dataset/ColonINST/Json-file")
-    #fix_value_in_wrong_key('/home/public/htnguyen/project/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-reg.json')
-    #merge_json()
-    #count()
-    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json", "r") as f:
-        data = json.load(f)
+    clean_text("./dataset/problematic_text.csv", "./dataset/ColonINST/Json-file")
     
-    st = ""
-    for n in data:
-        if len(n["conversations"][1]["value"]) > len(st):
-            st = n["conversations"][1]["value"]
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/val/ColonINST-val-reg.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cap.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/val/ColonINST-val-cls.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/val/ColonINST-val-rec.json')
     
-    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/test/ColonINST-test-cap.json", "r") as f:
-        data = json.load(f)
-    
-    for n in data:
-        if len(n["conversations"][1]["value"]) > len(st):
-            st = n["conversations"][1]["value"]
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/train/ColonINST-train-3tasks.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/train/ColonINST-train-cap.json')
 
-    with open("/home/public/htnguyen/projects/ColonGPT/dataset/ColonINST/Json-file-clean/val/ColonINST-val-cap.json", "r") as f:
-        data = json.load(f)
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/test/ColonINST-test-cap.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/test/ColonINST-test-cls.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/test/ColonINST-test-rec.json')
+    fix_value_in_wrong_key('./dataset/ColonINST/Json-file-clean/test/ColonINST-test-reg.json')
     
-    for n in data:
-        if len(n["conversations"][1]["value"]) > len(st):
-            st = n["conversations"][1]["value"]
-    print(st)
