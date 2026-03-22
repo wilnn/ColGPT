@@ -3,9 +3,12 @@ from ..model.processing_llava import LlavaProcessor
 from PIL import Image
 import torch
 from peft import PeftModel
+import gc
 
 device = "cuda:0"
-model_path = "./model/stage_2_all_caponly/checkpoint-16416"
+#model_path = "./model/stage_2_all_3tasks/checkpoint-44093"
+#processor_path = "./model/stage_2_all_3tasks"
+model_path = "./model/stage_2_all_caponly/checkpoint-18235"
 processor_path = "./model/stage_2_all_caponly"
 lora_adapter_path = ""
 
@@ -14,7 +17,8 @@ if lora_adapter_path:
     model = PeftModel.from_pretrained(model, lora_adapter_path, torch_device=device, safe_serialization=True)
 
 processor = LlavaProcessor.from_pretrained(processor_path)
-max_length = processor.tokenizer.model_max_length
+#max_length = processor.tokenizer.model_max_length
+max_length = 150
 eos_token_id = processor.tokenizer.eos_token_id
 
 #image = Image.open()
@@ -26,9 +30,9 @@ user = {"role": "user",
 
 #conversations = [[{"role": "system","content": "You are a colonoscopy assistant providing help with colonoscopy tasks."}]]
 
-inp = input("user: ")
+inp = input("\nuser: ")
 while inp:
-    print("\n")
+    print("")
     conversations = [[{"role": "system","content": "You are a colonoscopy assistant providing help with colonoscopy tasks."}]]
     user['content'] = inp
     conversations[0].append(user)
@@ -57,11 +61,16 @@ while inp:
                     )
         
         logits = outputs.logits
-
+        
         past_key_values = outputs.past_key_values
-        #print(dir(outputs.past_key_values.layers[0]))
-        #print(outputs.past_key_values.layers[0].keys.shape)
-        #exit(0)
+        
+        if i % 8 == 0:
+            del outputs
+            # Collect CPU memory
+            gc.collect()
+            # Free GPU memory
+            torch.cuda.empty_cache()
+
         #position_ids = torch.tensor([[outputs.past_key_values.layers[0].keys.shape[2] +1]], device=device)
         next_token = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
         attention_mask = torch.cat([attention_mask,
@@ -78,6 +87,7 @@ while inp:
         # Only feed the new token next iteration
         input_ids = next_token
         images = None
+        image_pos=None
 
         # stop if EOS
         if next_token.item() == eos_token_id:
