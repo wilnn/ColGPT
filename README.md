@@ -2,13 +2,22 @@
 ## Introduction
 - A vision-language model based on the LLaVA architecture, capable of image captioning, classification, and object detection for colonoscopy.
 - Utilizes LLaMA, SigLIP, and Spatial Pyramid Pooling (SPP) for improved visual understanding, assisting clinicians in anomaly detection and generating automated reports.
-
+| Task          | Metric            | Value | Notes                                           |
+|---------------|------------------|-------|-------------------------------------------------|
+| Regression    | Macro F1         | 91.4  |                                                 |
+| Regression    | UAR              | 92.8  |                                                 |
+| Recognition   | Mean IoU         | 54.7  |                                                 |
+| Recognition   | Acc IoU          | 65.1  |                                                 |
+| Classification| Macro F1         | 84.3  |                                                 |
+| Classification| UAR              | 85.0  |                                                 |
+| Captioning    | Perplexity       | 4.86  | No overall perplexity for all 3 tasks (possible bug) |
 ## Demo
+<video src="assets/demo.mp4"></video>
 
 ## Dataset
 the dataset and original work is from [https://github.com/ai4colonoscopy/IntelliScope](https://github.com/ai4colonoscopy/IntelliScope)
 
-## Setup:
+## Setup
 - Install the dependencies:
   ```
   git clone git@github.com:wilnn/ColGPT.git
@@ -41,7 +50,7 @@ the dataset and original work is from [https://github.com/ai4colonoscopy/Intelli
                       ├──Positive-images
   ```
 
-## train:
+## train
 The model was trained on two RTX 6000 ADA GPUs
 
 Stage 1 training:
