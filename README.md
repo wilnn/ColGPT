@@ -1,18 +1,17 @@
 # ColonGPT
 ## Introduction
-- A vision-language model based on the LLaVA architecture, capable of image captioning, classification, and object detection for colonoscopy.
+- A vision-language model based on the LLaVA architecture for image classification, image captioning, and object detection for colonoscopy.
 - Utilizes LLaMA, SigLIP, and Spatial Pyramid Pooling (SPP) for improved visual understanding, assisting clinicians in anomaly detection and generating automated reports.
-| Task          | Metric            | Value | Notes                                           |
-|---------------|------------------|-------|-------------------------------------------------|
-| Regression    | Macro F1         | 91.4  |                                                 |
-| Regression    | UAR              | 92.8  |                                                 |
-| Recognition   | Mean IoU         | 54.7  |                                                 |
-| Recognition   | Acc IoU          | 65.1  |                                                 |
-| Classification| Macro F1         | 84.3  |                                                 |
-| Classification| UAR              | 85.0  |                                                 |
-| Captioning    | Perplexity       | 4.86  | No overall perplexity for all 3 tasks (possible bug) |
+
 ## Demo
-<video src="assets/demo.mp4"></video>
+https://github.com/user-attachments/assets/90c0f120-55d8-456e-9fe7-ebe6e36f82ca
+
+## Performance
+| Task             |   F1   |  UAR  | Mean IoU | Accuracy IoU | Perplexity |
+|------------------|--------|-------|----------|--------------|------------|
+| Classification   |84.3    |85.0   |N/A       |N/A           |1.4         |
+| Object Detection |91.4    |92.8   |54.7      |65.1          |5.56        |
+| Image Captioning |N/A     |N/A    |N/A       |N/A           |4.86        |
 
 ## Dataset
 the dataset and original work is from [https://github.com/ai4colonoscopy/IntelliScope](https://github.com/ai4colonoscopy/IntelliScope)
@@ -53,12 +52,20 @@ the dataset and original work is from [https://github.com/ai4colonoscopy/Intelli
 ## train
 The model was trained on two RTX 6000 ADA GPUs
 
-Stage 1 training:
+**Stage 1 training:**
 ```
 ./src/train/run_train_stage1.sh
 ```
 
-Stage 2 training:
+**Stage 2 training for 3 tasks:**
 ```
-./src/train/run_train_stage2.sh
+./src/train/run_train_stage2_3tasks.sh
 ```
+
+**Stage 2 training for image captioning:**
+```
+./src/train/run_train_stage2_cap.sh
+```
+
+## Acknowledgment
+The original work is from [https://github.com/ai4colonoscopy/IntelliScope](https://github.com/ai4colonoscopy/IntelliScope)
