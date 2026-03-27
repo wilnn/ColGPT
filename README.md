@@ -1,4 +1,4 @@
-# ColonGPT
+# ColGPT
 ## Introduction
 - A vision-language model based on the LLaVA architecture for image classification, image captioning, and object detection for colonoscopy.
 - Utilizes LLaMA, SigLIP, and Spatial Pyramid Pooling (SPP) for improved visual understanding, assisting clinicians in anomaly detection and generating automated reports.
